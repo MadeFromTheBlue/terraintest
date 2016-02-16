@@ -1,0 +1,14 @@
+group 'madeblue'
+version 'TEST'
+
+apply plugin: 'java'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+}
