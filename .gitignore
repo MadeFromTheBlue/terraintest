@@ -29,3 +29,6 @@ hs_err_pid*
 # Covers JetBrains
 .idea/*
 *.iml
+
+# Testing Output Files
+testout/*
