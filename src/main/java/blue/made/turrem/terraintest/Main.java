@@ -27,20 +27,22 @@ public class Main {
 		}
 
 		(new File("testout/")).mkdir();
-		for (int i = 0; i < 9; i++) {
-			long t = System.nanoTime();
-			if (i != 0)
-				mesh = mesh.run();
-			double dt = (System.nanoTime() - t) * 1e-6;
-			System.out.printf("New Mesh: %d Verts, %d Tris in %.2fms\n", mesh.getVerts().size(), mesh.getFaces().size(), dt);
-			PrintWriter out = new PrintWriter("testout/out" + i + ".obj");
-			for (GenMesh.Face f : mesh.getFaces()) {
-				out.printf("v %f %f %f\n", f.a.pos.x, f.a.pos.y, f.a.pos.z);
-				out.printf("v %f %f %f\n", f.b.pos.x, f.b.pos.y, f.b.pos.z);
-				out.printf("v %f %f %f\n", f.c.pos.x, f.c.pos.y, f.c.pos.z);
-				out.printf("f -1 -2 -3\n");
+		for (int i = 0; i <= 9; i++) {
+			if (i != 0) {
+				GenMesh.Info geninfo = new GenMesh.Info();
+				long t = System.nanoTime();
+				mesh = mesh.run(geninfo);
+				double dt = (System.nanoTime() - t) * 1e-6;
+				System.out.printf("New Mesh #%d: %s in %.2fms\n", i, geninfo, dt);
 			}
-			out.close();
 		}
+		PrintWriter out = new PrintWriter("testout/out" + ".obj");
+		for (GenMesh.Face f : mesh.getFaces()) {
+			out.printf("v %f %f %f\n", f.a.pos.x, f.a.pos.y, f.a.pos.z);
+			out.printf("v %f %f %f\n", f.b.pos.x, f.b.pos.y, f.b.pos.z);
+			out.printf("v %f %f %f\n", f.c.pos.x, f.c.pos.y, f.c.pos.z);
+			out.printf("f -1 -2 -3\n");
+		}
+		out.close();
 	}
 }

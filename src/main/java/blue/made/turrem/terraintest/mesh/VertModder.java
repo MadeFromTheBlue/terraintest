@@ -26,9 +26,11 @@ public class VertModder {
 	}
 
 	private GenVert vert;
+	public final int layer;
 
-	public VertModder(GenVert vert) {
+	public VertModder(GenVert vert, int layer) {
 		this.vert = vert;
+		this.layer = layer;
 	}
 
 	public GenVert getDown() {
