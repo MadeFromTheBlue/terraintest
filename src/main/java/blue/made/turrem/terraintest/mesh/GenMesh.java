@@ -9,37 +9,6 @@ import java.util.*;
  * Created by sam on 2/16/16.
  */
 public class GenMesh {
-	static class Edge {
-		public GenVert a;
-		public GenVert b;
-		public GenVert mid;
-		private double len = Double.NaN;
-
-		private Edge(GenVert a, GenVert b) {
-			this.a = a;
-			this.b = b;
-		}
-
-		public double len() {
-			if (len != Double.NaN)
-				return len;
-			len = Vector.subtract(a.pos, b.pos).length();
-			return len;
-		}
-
-		public int hashCode() {
-			return a.hashCode() ^ b.hashCode();
-		}
-
-		public boolean equals(Object obj) {
-			if (obj instanceof Edge) {
-				Edge other = (Edge) obj;
-				return (other.a == this.a && other.b == this.b) || (other.b == this.a && other.a == this.b);
-			}
-			return false;
-		}
-	}
-
 	public static class Face {
 		public GenVert a;
 		public GenVert b;
@@ -54,13 +23,11 @@ public class GenMesh {
 
 	public static class Info {
 		public long opnum = 0;
-		public int vertnum = 0;
 		public int facenum = 0;
-		public int edgenum = 0;
 		public int maxops = 0;
 
 		public String toString() {
-			return String.format("Verts:%d Faces:%d Edges:%d Ops:%d MaxOps: %d", vertnum, facenum, edgenum, opnum, maxops);
+			return String.format("Faces:%d Ops:%d MaxOps: %d", facenum, opnum, maxops);
 		}
 	}
 
@@ -90,16 +57,11 @@ public class GenMesh {
 
 		public GenMesh build(int layer) {
 			GenMesh mesh = new GenMesh(layer);
-			mesh.verts.addAll(verts.values());
-			for (Face f : faces) {
-				mesh.connectVerts(f);
-			}
+			mesh.faces.addAll(faces);
 			return mesh;
 		}
 	}
 
-	private HashMap<Edge, Edge> edges = new HashMap<>(); // I cant use an Interner because they can't be iterated over
-	private ArrayList<GenVert> verts = new ArrayList<>();
 	private ArrayList<Face> faces = new ArrayList<>();
 	private GenMesh next = null;
 	public final int layer;
@@ -108,90 +70,33 @@ public class GenMesh {
 		this.layer = layer;
 	}
 
-	/**
-	 * Creates and adds the edges and the face between the given verts
-	 */
-	private void connectVerts(GenVert a, GenVert b, GenVert c) {
-		connectVerts(new Face(a, b, c));
-	}
-
-	private void connectVerts(Face f) {
+	private void add(Face f) {
 		faces.add(f);
-		createEdge(f.a, f.b);
-		createEdge(f.b, f.c);
-		createEdge(f.c, f.a);
 	}
 
-	private void connectNewVerts(GenVert a, GenVert b, GenVert c) {
-		Face f = new Face(a, b, c);
-		faces.add(f);
-		createNewEdge(f.a, f.b);
-		createNewEdge(f.b, f.c);
-		createNewEdge(f.c, f.a);
+	private void add(GenVert a, GenVert b, GenVert c) {
+		faces.add(new Face(a, b, c));
 	}
 
-	/**
-	 * Returns the edge the given verts if it already exists, otherwise it is created and added
-	 */
-	private Edge createEdge(GenVert a, GenVert b) {
-		Edge e = new Edge(a, b);
-		Edge got = edges.get(e);
-		if (got == null) {
-			got = e;
-			createNewEdge(e);
-		}
-		return got;
-	}
-
-	private Edge getEdge(GenVert a, GenVert b) {
-		return edges.get(new Edge(a, b));
-	}
-
-	private Edge createNewEdge(GenVert a, GenVert b) {
-		return createNewEdge(new Edge(a, b));
-	}
-
-	private Edge createNewEdge(Edge e) {
-		edges.put(e, e);
-		e.a.links.add(new GenVert.Link(e, e.b));
-		e.b.links.add(new GenVert.Link(e, e.a));
-		return e;
+	private GenVert mid(GenVert a, GenVert b) {
+		return new GenVert((Vector3d) Vector.mix(a.pos, b.pos, 0.5));
 	}
 
 	private GenMesh subdivide() {
 		GenMesh out = new GenMesh(layer + 1);
-		System.out.println("\tSubdivide...duplicate verts");
-		for (GenVert v : this.verts) {
-			// duplicate verts to next layer
-			GenVert down = new GenVert(v.pos.clone());
-			out.verts.add(down);
-			v.down = down;
-		}
-		System.out.println("\tSubdivide...midpoints and side edges");
-		for (Edge e : this.edges.values()) {
-			// create midpoints
-			GenVert mid = new GenVert((Vector3d) Vector.mix(e.a.pos, e.b.pos, 0.5));
-			e.mid = mid;
-			out.verts.add(mid);
-			// link midpoint
-			out.createNewEdge(e.a.down, mid);
-			out.createNewEdge(e.b.down, mid);
-		}
-		System.out.println("\tSubdivide...fill faces and inner edges");
 		for (Face f : faces) {
-			// fill faces
-			// get face edges
-			Edge ab = getEdge(f.a, f.b);
-			Edge bc = getEdge(f.b, f.c);
-			Edge ca = getEdge(f.c, f.a);
-			// create middle face with edges
-			out.connectNewVerts(ab.mid, bc.mid, ca.mid);
-			// edges should already exist, just add faces
-			out.faces.add(new Face(f.a.down, ab.mid, ca.mid));
-			out.faces.add(new Face(f.b.down, ab.mid, bc.mid));
-			out.faces.add(new Face(f.c.down, bc.mid, ca.mid));
+			GenVert a = new GenVert(f.a.pos.clone());
+			GenVert b = new GenVert(f.b.pos.clone());
+			GenVert c = new GenVert(f.c.pos.clone());
+			GenVert ab = mid(a, b);
+			GenVert bc = mid(b, c);
+			GenVert ca = mid(c, a);
+
+			out.add(ab, bc, ca);
+			out.add(a, ab, ca);
+			out.add(b, ab, bc);
+			out.add(c, bc, ca);
 		}
-		System.out.println("\tSubdivide...done");
 		return out;
 	}
 
@@ -205,25 +110,13 @@ public class GenMesh {
 
 		if (next == null) {
 			next = this.subdivide();
-			for (GenVert v : this.verts) {
-				VertModder modder = new VertModder(v, layer);
-				if (v.ops.size() > info.maxops)
-					info.maxops = v.ops.size();
-				while (!v.ops.isEmpty()) {
-					info.opnum++;
-					v.ops.poll().run(modder);
-				}
+			for (Face f : next.faces) {
+
 			}
 		}
 
-		info.vertnum = next.verts.size();
 		info.facenum = next.faces.size();
-		info.edgenum = next.edges.size();
 		return next;
-	}
-
-	public List<GenVert> getVerts() {
-		return Collections.unmodifiableList(verts);
 	}
 
 	public List<Face> getFaces() {

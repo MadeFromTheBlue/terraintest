@@ -1,10 +1,8 @@
 package blue.made.turrem.terraintest;
 
 import blue.made.turrem.terraintest.mesh.GenMesh;
-import blue.made.turrem.terraintest.ops.Perlin;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 
@@ -16,11 +14,10 @@ public class Main {
 		GenMesh mesh;
 		{
 			GenMesh.Builder b = GenMesh.create();
-			Perlin p = new Perlin();
-			b.addVert(new Vector3d(0, 0, 0), 0).ops.add(p);
-			b.addVert(new Vector3d(1, 0, 0), 1).ops.add(p);
-			b.addVert(new Vector3d(0.5, 0.866025, 0), 2).ops.add(p);
-			b.addVert(new Vector3d(1.5, 0.866025, 0), 3).ops.add(p);
+			b.addVert(new Vector3d(0, 0, 0), 0);
+			b.addVert(new Vector3d(1, 0, 0), 1);
+			b.addVert(new Vector3d(0.5, 0.866025, 0), 2);
+			b.addVert(new Vector3d(1.5, 0.866025, 0), 3);
 
 			b.addFace(0, 1, 2);
 			b.addFace(1, 2, 3);
