@@ -1,19 +1,26 @@
 package blue.made.turrem.terraintest.mesh;
 
+import blue.made.turrem.terraintest.Vector;
 import blue.made.turrem.terraintest.Vector3d;
-import blue.made.turrem.terraintest.ops.IMeshOp;
-
-import java.util.LinkedList;
 
 /**
- * Created by doctorocclusion on 2/16/2016.
+ * Created by sam on 2/18/16.
  */
-public class GenVert {
-	public Vector3d pos;
-	private Vector3d norm;
-	GenVert down;
+public class GenVert extends Vector3d {
+	private GenVert next;
 
-	public GenVert(Vector3d pos) {
-		this.pos = pos;
+	GenVert(Vector pos) {
+		super(pos);
+	}
+
+	GenVert() {
+		super();
+	}
+
+	GenVert next() {
+		if (next == null) {
+			next = new GenVert(this);
+		}
+		return next;
 	}
 }

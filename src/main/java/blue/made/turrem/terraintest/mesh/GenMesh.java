@@ -2,6 +2,8 @@ package blue.made.turrem.terraintest.mesh;
 
 import blue.made.turrem.terraintest.Vector;
 import blue.made.turrem.terraintest.Vector3d;
+import com.google.common.collect.Interner;
+import com.google.common.collect.Interners;
 
 import java.util.*;
 
@@ -9,114 +11,130 @@ import java.util.*;
  * Created by sam on 2/16/16.
  */
 public class GenMesh {
-	public static class Face {
-		public GenVert a;
-		public GenVert b;
-		public GenVert c;
+	public static class DebugData {
+		public long opnum = 0;
+		public int facenum = 0;
+		public long subdms;
+		public long opsms;
 
-		public Face(GenVert a, GenVert b, GenVert c) {
-			this.a = a;
-			this.b = b;
-			this.c = c;
+		public String toString() {
+			return String.format("Faces:%d Ops:%d in Subd:%.3fs Ops:%.3fs", facenum, opnum, subdms / 1000., opsms / 1000.);
 		}
 	}
 
-	public static class Info {
-		public long opnum = 0;
-		public int facenum = 0;
-		public int maxops = 0;
+	public class Info {
+		public int layer() {
+			return GenMesh.this.layer;
+		}
+	}
 
-		public String toString() {
-			return String.format("Faces:%d Ops:%d MaxOps: %d", facenum, opnum, maxops);
+	private static class Pair {
+		final GenVert a;
+		final GenVert b;
+		GenVert mid;
+
+		public Pair(GenVert a, GenVert b) {
+			this.a = a;
+			this.b = b;
+		}
+
+		public int hashCode() {
+			return a.hashCode() ^ b.hashCode();
+		}
+
+		public boolean equals(Object obj) {
+			if (obj instanceof Pair) {
+				Pair other = (Pair) obj;
+				return (this.a == other.a && this.b == other.b) || (this.a == other.b && this.b == other.a);
+			}
+			return false;
 		}
 	}
 
 	public static class Builder {
 		private HashMap<Integer, GenVert> verts = new HashMap<>();
-		private ArrayList<Face> faces = new ArrayList<>();
+		private GenMesh out;
 
-		private Builder() {}
-
-		public GenVert addVert(Vector3d vert, int id) {
-			GenVert out = new GenVert(vert);
-			verts.put(id, out);
-			return out;
+		private Builder() {
+			this(0);
 		}
 
-		public void addFace(int a, int b, int c) {
-			Face f = new Face(verts.get(a), verts.get(b), verts.get(c));
-			if (f.a == null || f.b == null || f.c == null) {
+		private Builder(int layer) {
+			out = new GenMesh(layer);
+		}
+
+		public void addVert(Vector3d vert, int id) {
+			verts.put(id, new GenVert(vert));
+		}
+
+		public Face addFace(int a, int b, int c) {
+			Face f = new Face(verts.get(a), verts.get(b), verts.get(c), out);
+			if (f.verts[0] == null || f.verts[1] == null || f.verts[2] == null) {
 				throw new IllegalArgumentException("One of the verts has not been added");
 			}
-			faces.add(f);
+			out.faces.add(f);
+			return f;
 		}
 
-		public GenMesh build() {
-			return build(0);
-		}
-
-		public GenMesh build(int layer) {
-			GenMesh mesh = new GenMesh(layer);
-			mesh.faces.addAll(faces);
-			return mesh;
+		public GenMesh get() {
+			return out;
 		}
 	}
 
 	private ArrayList<Face> faces = new ArrayList<>();
-	private GenMesh next = null;
+	private Interner<Pair> edges = Interners.newStrongInterner();
 	public final int layer;
+	public final Info info = new Info();
 
 	private GenMesh(int layer) {
 		this.layer = layer;
 	}
 
-	private void add(Face f) {
+	private Face add(Face f) {
 		faces.add(f);
+		return f;
 	}
 
-	private void add(GenVert a, GenVert b, GenVert c) {
-		faces.add(new Face(a, b, c));
+	private Face add(GenVert a, GenVert b, GenVert c) {
+		Face f = new Face(a, b, c, this);
+		faces.add(f);
+		return f;
 	}
 
 	private GenVert mid(GenVert a, GenVert b) {
-		return new GenVert((Vector3d) Vector.mix(a.pos, b.pos, 0.5));
+		Pair p = edges.intern(new Pair(a, b));
+		if (p.mid == null) {
+			p.mid = new GenVert(a);
+			p.mid.add(b);
+			p.mid.multiply(0.5);
+		}
+		return p.mid;
 	}
 
-	private GenMesh subdivide() {
+	public GenMesh subdivide() {
 		GenMesh out = new GenMesh(layer + 1);
 		for (Face f : faces) {
-			GenVert a = new GenVert(f.a.pos.clone());
-			GenVert b = new GenVert(f.b.pos.clone());
-			GenVert c = new GenVert(f.c.pos.clone());
+			GenVert a = f.verts[0].next();
+			GenVert b = f.verts[1].next();
+			GenVert c = f.verts[2].next();
 			GenVert ab = mid(a, b);
 			GenVert bc = mid(b, c);
 			GenVert ca = mid(c, a);
 
-			out.add(ab, bc, ca);
-			out.add(a, ab, ca);
-			out.add(b, ab, bc);
-			out.add(c, bc, ca);
+			out.add(ab, bc, ca).ops = f.childOps[3];
+			out.add(a, ab, ca).ops = f.childOps[0];
+			out.add(b, ab, bc).ops = f.childOps[1];
+			out.add(c, bc, ca).ops = f.childOps[2];
 		}
 		return out;
 	}
 
-	public GenMesh run() {
-		return run(null);
-	}
-
-	public GenMesh run(Info info) {
-		if (info == null)
-			info = new Info();
-
-		if (next == null) {
-			next = this.subdivide();
-			for (Face f : next.faces) {
-
+	public void run() {
+		for (Face f : faces) {
+			while (!f.ops.isEmpty()) {
+				f.ops.poll().run(f);
 			}
 		}
-
-		info.facenum = next.faces.size();
-		return next;
 	}
 
 	public List<Face> getFaces() {
