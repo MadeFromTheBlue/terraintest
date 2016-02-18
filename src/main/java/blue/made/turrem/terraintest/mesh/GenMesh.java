@@ -2,9 +2,6 @@ package blue.made.turrem.terraintest.mesh;
 
 import blue.made.turrem.terraintest.Vector;
 import blue.made.turrem.terraintest.Vector3d;
-import blue.made.turrem.terraintest.ops.IMeshOp;
-import com.google.common.collect.Interner;
-import com.google.common.collect.Interners;
 
 import java.util.*;
 
@@ -60,9 +57,10 @@ public class GenMesh {
 		public int vertnum = 0;
 		public int facenum = 0;
 		public int edgenum = 0;
+		public int maxops = 0;
 
 		public String toString() {
-			return String.format("Verts:%d Faces:%d Edges:%d Ops:%d", vertnum, facenum, edgenum, opnum);
+			return String.format("Verts:%d Faces:%d Edges:%d Ops:%d MaxOps: %d", vertnum, facenum, edgenum, opnum, maxops);
 		}
 	}
 
@@ -209,6 +207,8 @@ public class GenMesh {
 			next = this.subdivide();
 			for (GenVert v : this.verts) {
 				VertModder modder = new VertModder(v, layer);
+				if (v.ops.size() > info.maxops)
+					info.maxops = v.ops.size();
 				while (!v.ops.isEmpty()) {
 					info.opnum++;
 					v.ops.poll().run(modder);
